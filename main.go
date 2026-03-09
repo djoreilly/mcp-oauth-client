@@ -8,6 +8,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"flag"
 	"fmt"
@@ -26,6 +28,7 @@ var (
 	serverURL = flag.String("server-url", "", "URL of the MCP server.")
 	// Port for the local HTTP server that will receive the authorization code.
 	callbackPort = flag.Int("callback-port", 3142, "Port for the local HTTP server that will receive the authorization code.")
+	caCertFile   = flag.String("cacert", "", "cacert to verify the TLS server")
 )
 
 type codeReceiver struct {
@@ -116,7 +119,27 @@ func main() {
 		log.Fatalf("failed to create auth handler: %v", err)
 	}
 
+	httpClient := http.DefaultClient
+	if *caCertFile != "" {
+		caCert, err := os.ReadFile(*caCertFile)
+		if err != nil {
+			log.Fatalf("could not read cacert file: %s: %v", *caCertFile, err)
+		}
+		rootCAs := x509.NewCertPool()
+		if !rootCAs.AppendCertsFromPEM(caCert) {
+			log.Fatal("append certs to rootCAs failed")
+		}
+		httpClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs: rootCAs,
+				},
+			},
+		}
+	}
+
 	transport := &mcp.StreamableClientTransport{
+		HTTPClient:   httpClient,
 		Endpoint:     *serverURL,
 		OAuthHandler: authHandler,
 	}
