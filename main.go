@@ -14,16 +14,18 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/modelcontextprotocol/go-sdk/oauthex"
 )
 
 var (
 	// URL of the MCP server.
-	serverURL = flag.String("server_url", "http://localhost:8000/mcp", "URL of the MCP server.")
+	serverURL = flag.String("server-url", "", "URL of the MCP server.")
 	// Port for the local HTTP server that will receive the authorization code.
-	callbackPort = flag.Int("callback_port", 3142, "Port for the local HTTP server that will receive the authorization code.")
+	callbackPort = flag.Int("callback-port", 3142, "Port for the local HTTP server that will receive the authorization code.")
 )
 
 type codeReceiver struct {
@@ -83,24 +85,33 @@ func main() {
 	go receiver.serveRedirectHandler(listener)
 	defer receiver.close()
 
-	authHandler, err := auth.NewAuthorizationCodeHandler(&auth.AuthorizationCodeHandlerConfig{
+	authCodeHandlerCfg := &auth.AuthorizationCodeHandlerConfig{
 		RedirectURL:              fmt.Sprintf("http://localhost:%d", *callbackPort),
 		AuthorizationCodeFetcher: receiver.getAuthorizationCode,
-		// Uncomment the client configuration you want to use.
-		// PreregisteredClientConfig: &auth.PreregisteredClientConfig{
-		// 	ClientSecretAuthConfig: &auth.ClientSecretAuthConfig{
-		// 		ClientID:     "",
-		// 		ClientSecret: "",
-		// 	},
-		// },
-		// DynamicClientRegistrationConfig: &auth.DynamicClientRegistrationConfig{
-		// 	Metadata: &oauthex.ClientRegistrationMetadata{
-		// 		ClientName: "Dynamically registered MCP client",
-		// 		RedirectURIs: []string{fmt.Sprintf("http://localhost:%d", *callbackPort)},
-		// 		Scope: "read",
-		// 	},
-		// },
-	})
+	}
+	clientID := os.Getenv("CLIENT_ID")
+	clientSecret := os.Getenv("CLIENT_SECRET")
+	if clientID != "" {
+		if clientSecret == "" {
+			// the go-sdk requires CLIENT_SECRET even if not using client authentication
+			log.Print("warning: CLIENT_SECRET needs to be set with CLIENT_ID.")
+			log.Print("If client authentication is disabled, set it CLIENT_SECRET to anything.")
+		}
+		authCodeHandlerCfg.PreregisteredClientConfig = &auth.PreregisteredClientConfig{
+			ClientSecretAuthConfig: &auth.ClientSecretAuthConfig{
+				ClientID:     clientID,
+				ClientSecret: clientSecret,
+			},
+		}
+	} else {
+		authCodeHandlerCfg.DynamicClientRegistrationConfig = &auth.DynamicClientRegistrationConfig{
+			Metadata: &oauthex.ClientRegistrationMetadata{
+				ClientName:   "Dynamically registered MCP client",
+				RedirectURIs: []string{fmt.Sprintf("http://localhost:%d", *callbackPort)},
+			},
+		}
+	}
+	authHandler, err := auth.NewAuthorizationCodeHandler(authCodeHandlerCfg)
 	if err != nil {
 		log.Fatalf("failed to create auth handler: %v", err)
 	}
