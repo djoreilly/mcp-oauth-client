@@ -14,6 +14,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -30,7 +31,15 @@ var (
 	// Port for the local HTTP server that will receive the authorization code.
 	callbackPort = flag.Int("callback-port", 3142, "Port for the local HTTP server that will receive the authorization code.")
 	caCertFile   = flag.String("cacert", "", "cacert to verify the TLS server")
+	debugLogging = flag.Bool("debug", false, "enable debug logging jsonrpc for calls")
 )
+
+type debugLogger struct{}
+
+func (*debugLogger) Write(p []byte) (int, error) {
+	slog.Debug(string(p))
+	return len(p), nil
+}
 
 type codeReceiver struct {
 	authChan chan *auth.AuthorizationResult
@@ -228,6 +237,9 @@ func (c *AuthClient) InteractiveLoop(ctx context.Context) error {
 
 func main() {
 	flag.Parse()
+	if *debugLogging {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
 	receiver := &codeReceiver{
 		authChan: make(chan *auth.AuthorizationResult),
 		errChan:  make(chan error),
@@ -295,9 +307,14 @@ func main() {
 		OAuthHandler: authHandler,
 	}
 
+	loggingTransport := &mcp.LoggingTransport{
+		Transport: transport,
+		Writer:    &debugLogger{},
+	}
+
 	// Create and connect client
 	ctx := context.Background()
-	client := NewAuthClient(transport)
+	client := NewAuthClient(loggingTransport)
 	if err := client.Connect(ctx); err != nil {
 		log.Fatalf("Connection failed: %v", err)
 	}
