@@ -2,8 +2,6 @@
 // Use of this source code is governed by the license
 // that can be found in the LICENSE file.
 
-//go:build mcp_go_client_oauth
-
 package main
 
 import (
@@ -253,9 +251,9 @@ func main() {
 			log.Print("warning: CLIENT_SECRET needs to be set with CLIENT_ID.")
 			log.Print("If client authentication is disabled, set it CLIENT_SECRET to anything.")
 		}
-		authCodeHandlerCfg.PreregisteredClientConfig = &auth.PreregisteredClientConfig{
-			ClientSecretAuthConfig: &auth.ClientSecretAuthConfig{
-				ClientID:     clientID,
+		authCodeHandlerCfg.PreregisteredClient = &oauthex.ClientCredentials{
+			ClientID: clientID,
+			ClientSecretAuth: &oauthex.ClientSecretAuth{
 				ClientSecret: clientSecret,
 			},
 		}

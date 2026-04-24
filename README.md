@@ -6,7 +6,7 @@ A simple CLI alternative to [MCP Inspector](https://github.com/modelcontextproto
 ```bash
 CLIENT_ID=mcp-test-client \
 CLIENT_SECRET=UzErcSLIH04pnEXDUvegmzF4xwKSR6Xc \
-GOFLAGS="-tags=mcp_go_client_oauth" go run main.go \
+go run main.go \
 --server-url http://localhost:7777/mcp
 Connecting to MCP server...
 Please open the following URL in your browser: http://localhost:8090/realms/mcp-realm/protocol/openid-connect/auth?client_id=mcp-test-client&code_challenge=Q-_Cko7VvCgFkxhKuJA792KIW6QGqQ_JghUfcJYlu3I&code_challenge_method=S256&redirect_uri
@@ -34,7 +34,7 @@ mcp> quit
 ## DCR
 Dynamic Client Registration will be tried if `CLIENT_ID` is not set.
 ```bash
-GOFLAGS="-tags=mcp_go_client_oauth" go run main.go \
+go run main.go \
 --server-url http://localhost:7777/mcp
 ...
 ```
