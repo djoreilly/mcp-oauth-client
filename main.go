@@ -135,7 +135,10 @@ func (c *AuthClient) ListTools(ctx context.Context) error {
 		count++
 		fmt.Printf("%d. %s", count, tool.Name)
 		if tool.Description != "" {
-			fmt.Printf("\n   Description: %s", tool.Description)
+			for line := range strings.SplitSeq(tool.Description, "\n") {
+				padding := strings.Repeat(" ", 3+count/10)
+				fmt.Printf("\n%s%s", padding, line)
+			}
 		}
 		fmt.Println()
 	}
