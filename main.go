@@ -51,6 +51,12 @@ type codeReceiver struct {
 func (r *codeReceiver) serveRedirectHandler(listener net.Listener) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Query().Get("error") != "" {
+			fmt.Fprint(w, "Authentication failed.")
+			slog.Error("authentication failed", "error", req.URL.Query().Get("error"), "description", req.URL.Query().Get("error_description"))
+			r.errChan <- fmt.Errorf("auth failed: %s: %s", req.URL.Query().Get("error"), req.URL.Query().Get("error_description"))
+			return
+		}
 		r.authChan <- &auth.AuthorizationResult{
 			Code:  req.URL.Query().Get("code"),
 			State: req.URL.Query().Get("state"),
