@@ -33,6 +33,7 @@ var (
 	callbackPort = flag.Int("callback-port", 3142, "Port for the local HTTP server that will receive the authorization code.")
 	caCertFile   = flag.String("cacert", "", "cacert to verify the TLS server")
 	debugLogging = flag.Bool("debug", false, "enable debug logging")
+	publicClient = flag.Bool("public-client", false, "use with CLIENT_ID for non-confidential client")
 )
 
 type debugLogger struct{}
@@ -289,9 +290,14 @@ func main() {
 	clientSecret := os.Getenv("CLIENT_SECRET")
 	if clientID != "" {
 		if clientSecret == "" {
-			// the go-sdk requires CLIENT_SECRET even if not using client authentication
-			log.Print("warning: CLIENT_SECRET needs to be set with CLIENT_ID.")
-			log.Print("If client authentication is disabled, set it CLIENT_SECRET to anything.")
+			if *publicClient {
+				// the go-sdk requires CLIENT_SECRET even if not using client authentication
+				clientSecret = "something not blank"
+			} else {
+				log.Print("CLIENT_SECRET needs to be set with CLIENT_ID.")
+				log.Print("Set CLIENT_SECRET env var, or use --public-client for non-confidential client")
+				os.Exit(1)
+			}
 		}
 		authCodeHandlerCfg.PreregisteredClient = &oauthex.ClientCredentials{
 			ClientID: clientID,
