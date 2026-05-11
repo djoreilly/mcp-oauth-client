@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"strings"
 
@@ -31,7 +32,7 @@ var (
 	// Port for the local HTTP server that will receive the authorization code.
 	callbackPort = flag.Int("callback-port", 3142, "Port for the local HTTP server that will receive the authorization code.")
 	caCertFile   = flag.String("cacert", "", "cacert to verify the TLS server")
-	debugLogging = flag.Bool("debug", false, "enable debug logging jsonrpc for calls")
+	debugLogging = flag.Bool("debug", false, "enable debug logging")
 )
 
 type debugLogger struct{}
@@ -39,6 +40,27 @@ type debugLogger struct{}
 func (*debugLogger) Write(p []byte) (int, error) {
 	slog.Debug(string(p))
 	return len(p), nil
+}
+
+type logRoundTripper struct {
+	transport http.RoundTripper
+}
+
+func (lrt logRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	resp, err := lrt.transport.RoundTrip(request)
+	if err != nil {
+		slog.Error("httpclient", "method", request.Method, "url", request.URL, "error", err)
+		return nil, err
+	}
+	if resp.StatusCode < 500 {
+		slog.Debug("httpclient", "method", request.Method, "url", request.URL, "status", resp.Status)
+	} else {
+		// sometimes the body has details
+		dump, _ := httputil.DumpResponse(resp, true)
+		_, body, _ := strings.Cut(string(dump), "\r\n\r\n")
+		slog.Warn("httpclient", "method", request.Method, "url", request.URL, "status", resp.Status, "body", body)
+	}
+	return resp, err
 }
 
 type codeReceiver struct {
@@ -291,7 +313,7 @@ func main() {
 		log.Fatalf("failed to create auth handler: %v", err)
 	}
 
-	httpClient := http.DefaultClient
+	httpTransport := http.DefaultTransport
 	if *caCertFile != "" {
 		caCert, err := os.ReadFile(*caCertFile)
 		if err != nil {
@@ -301,13 +323,15 @@ func main() {
 		if !rootCAs.AppendCertsFromPEM(caCert) {
 			log.Fatal("append certs to rootCAs failed")
 		}
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					RootCAs: rootCAs,
-				},
+
+		httpTransport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: rootCAs,
 			},
 		}
+	}
+	httpClient := &http.Client{
+		Transport: logRoundTripper{transport: httpTransport},
 	}
 
 	transport := &mcp.StreamableClientTransport{
