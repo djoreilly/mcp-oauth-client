@@ -66,7 +66,6 @@ func (lrt logRoundTripper) RoundTrip(request *http.Request) (*http.Response, err
 type codeReceiver struct {
 	authChan chan *auth.AuthorizationResult
 	errChan  chan error
-	listener net.Listener
 	server   *http.Server
 }
 
